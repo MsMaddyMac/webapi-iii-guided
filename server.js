@@ -16,11 +16,25 @@ function logger(req, res, next) {
 
 // write a gatekeeper middleware that reads a password from the headers and if the password is 'melon', let it continue. If not, send back status code 401 and a message.
 function atGate(req, res, next) {
-  if(req.headers === 'melon') {
+  const password = req.headers.password;
+
+  if(password && password.toLowerCase() === 'mellon') {
     next();
   } else {
     res.status(401).json({ message: 'You shall not pass!' })
   }
+}
+
+
+// check to see if role is 'admin' or 'agent'
+function checkRole(role) {
+  return function(req, res, next){
+    if (role && role === req.headers.role) {
+      next();
+    } else {
+      res.status(403).json({ message: "can't touch this!" });
+    }
+  };
 }
 
 
@@ -30,7 +44,7 @@ server.use(logger);
 
 
 // endpoints
-server.use('/api/hubs', helmet(), hubsRouter); // the router is local middleware because it only applies to /api/hubs. Invoking helmet here makes it's use local being applied to these specific endpoints
+server.use('/api/hubs', helmet(), atGate, checkRole('admin'), hubsRouter); // the router is local middleware because it only applies to /api/hubs. Invoking helmet here makes it's use local being applied to these specific endpoints
 
 server.get('/', (req, res) => {
   const nameInsert = (req.name) ? ` ${req.name}` : '';
@@ -46,7 +60,7 @@ server.get('/echo', (req, res) => {
 }); // not protected by helmet, so all header info is shared on the internet subjecting it to hacker attacks.
 
 // want to use helmet to protect this endpoint, protects this 'top secret' endpoint by not sharing vulnerable information on the internet.
-server.get('/area51', atGate, (req, res) => {
+server.get('/area51', atGate, checkRole('agent'), (req, res) => {
   res.send(req.headers);
 });
 
